@@ -1,0 +1,68 @@
+blueprint:
+  name: Rollladen – Position per Hoch/Runter/Stop + Delay
+  description: >
+    Fahre einen Rollladen erst komplett hoch, warte, dann runter und stoppe
+    nach der gewünschten Zeit. Buttons und input_number-Helfer sind parametrierbar.
+  domain: script
+  source_url: https://example.com/blueprints/rollladen_position_delay
+  author: Tobias
+
+  input:
+    btn_up:
+      name: Button Hoch
+      description: Button-Entity zum Hochfahren des Rollladens
+      selector:
+        entity:
+          domain: button
+    btn_down:
+      name: Button Runter
+      description: Button-Entity zum Runterfahren des Rollladens
+      selector:
+        entity:
+          domain: button
+    btn_stop:
+      name: Button Stop
+      description: Button-Entity zum Stoppen des Rollladens
+      selector:
+        entity:
+          domain: button
+
+    delay_full_close_helper:
+      name: Helfer – Zeit komplett zu
+      description: input_number-Entity für die Zeit (Sekunden) bis komplett zu/oben
+      selector:
+        entity:
+          domain: input_number
+
+    delay_target_pos_helper:
+      name: Helfer – Zeit Zielposition
+      description: input_number-Entity für die Zeit (Sekunden) bis zur Zielposition
+      selector:
+        entity:
+          domain: input_number
+
+mode: single
+alias: Blueprint-Rollladen-Position
+
+sequence:
+  - action: button.press
+    target:
+      entity_id: !input btn_up
+
+  - delay:
+      seconds: "{{ states(!input delay_full_close_helper) | int }}"
+
+  - action: button.press
+    target:
+      entity_id: !input btn_stop
+
+  - action: button.press
+    target:
+      entity_id: !input btn_down
+
+  - delay:
+      seconds: "{{ states(!input delay_target_pos_helper) | int }}"
+
+  - action: button.press
+    target:
+      entity_id: !input btn_stop
