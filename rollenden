@@ -1,68 +1,120 @@
 blueprint:
-  name: Rollladen – Position per Hoch/Runter/Stop + Delay
+  name: Rolladen-Fensterposition (Skript)
   description: >
-    Fahre einen Rollladen erst komplett hoch, warte, dann runter und stoppe
-    nach der gewünschten Zeit. Buttons und input_number-Helfer sind parametrierbar.
+    Erst hochfahren, dann nach Verzögerung stoppen, runterfahren,
+    erneut stoppen. Verzögerungen werden aus vier input_number-Helfern
+    für die verschiedenen Fensterpositionen gewählt.
   domain: script
-  source_url: https://example.com/blueprints/rollladen_position_delay
-  author: Tobias
+  source_url: https://example.com/rolladen-fensterposition-blueprint
+  author: Tobias_L_custom
 
   input:
-    btn_up:
-      name: Button Hoch
-      description: Button-Entity zum Hochfahren des Rollladens
+    button_hoch:
+      name: Button "hoch"
+      description: Button-Entity für Hochfahren des Rolladens
       selector:
         entity:
           domain: button
-    btn_down:
-      name: Button Runter
-      description: Button-Entity zum Runterfahren des Rollladens
+    button_runter:
+      name: Button "runter"
+      description: Button-Entity für Runterfahren des Rolladens
       selector:
         entity:
           domain: button
-    btn_stop:
-      name: Button Stop
-      description: Button-Entity zum Stoppen des Rollladens
+    button_stop:
+      name: Button "stop"
+      description: Button-Entity zum Stoppen des Rolladens
       selector:
         entity:
           domain: button
 
-    delay_full_close_helper:
-      name: Helfer – Zeit komplett zu
-      description: input_number-Entity für die Zeit (Sekunden) bis komplett zu/oben
+    delay_fenster_komplett_zu:
+      name: Input Number "Fenster komplett zu"
+      description: Helfer, der die Verzögerung für komplett zu in Sekunden enthält
       selector:
         entity:
           domain: input_number
 
-    delay_target_pos_helper:
-      name: Helfer – Zeit Zielposition
-      description: input_number-Entity für die Zeit (Sekunden) bis zur Zielposition
+    delay_fenster_halb_zu:
+      name: Input Number "Fenster halb zu"
+      description: Helfer, der die Verzögerung für halb zu in Sekunden enthält
       selector:
         entity:
           domain: input_number
 
-mode: single
-alias: Blueprint-Rollladen-Position
+    delay_fenster_drei_viertel_zu:
+      name: Input Number "Fenster drei-viertel zu"
+      description: Helfer, der die Verzögerung für drei-viertel zu in Sekunden enthält
+      selector:
+        entity:
+          domain: input_number
+
+    delay_fenster_gross_drei_viertel_zu:
+      name: Input Number "Fenster groß drei-viertel zu"
+      description: Helfer, der die Verzögerung für groß drei-viertel zu in Sekunden enthält
+      selector:
+        entity:
+          domain: input_number
+
+    ziel_position:
+      name: Ziel-Position
+      description: Welche Fensterposition soll angefahren werden?
+      default: halb
+      selector:
+        select:
+          options:
+            - label: Fenster komplett zu
+              value: komplett
+            - label: Fenster halb zu
+              value: halb
+            - label: Fenster drei-viertel zu
+              value: drei_viertel
+            - label: Fenster groß drei-viertel zu
+              value: gross_drei_viertel
+
+mode: restart
+alias: Rolladen-Fensterposition-Skript
 
 sequence:
+  # Hochfahren
   - action: button.press
     target:
-      entity_id: !input btn_up
+      entity_id: !input button_hoch
 
+  # Vollständig hoch -> dann Stopp
   - delay:
-      seconds: "{{ states(!input delay_full_close_helper) | int }}"
-
+      seconds: "{{ states(!input delay_fenster_komplett_zu) | int }}"
   - action: button.press
     target:
-      entity_id: !input btn_stop
+      entity_id: !input button_stop
 
+  # Runterfahren
   - action: button.press
     target:
-      entity_id: !input btn_down
+      entity_id: !input button_runter
 
-  - delay:
-      seconds: "{{ states(!input delay_target_pos_helper) | int }}"
-
+  # Entsprechend Ziel-Position verzögert wieder stoppen
+  - choose:
+      - conditions: "{{ !input ziel_position == 'halb' }}"
+        sequence:
+          - delay:
+              seconds: "{{ states(!input delay_fenster_halb_zu) | int }}"
+      - conditions: "{{ !input ziel_position == 'drei_viertel' }}"
+        sequence:
+          - delay:
+              seconds: "{{ states(!input delay_fenster_drei_viertel_zu) | int }}"
+      - conditions: "{{ !input ziel_position == 'gross_drei_viertel' }}"
+        sequence:
+          - delay:
+              seconds: "{{ states(!input delay_fenster_gross_drei_viertel_zu) | int }}"
+      - conditions: "{{ !input ziel_position == 'komplett' }}"
+        sequence:
+          # Für "komplett zu" ist nach Runterfahren ggf. keine zusätzliche
+          # Verzögerung nötig – hier kannst du bei Bedarf noch was einbauen.
+          - delay:
+              seconds: 0
+    default: []
   - action: button.press
     target:
-      entity_id: !input btn_stop
+      entity_id: !input button_stop
+
