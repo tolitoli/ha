@@ -1,115 +1,144 @@
 blueprint:
-  name: Rolladen Script – Fensterposition
-  description: Erzeugt ein Script für eine definierte Fensterposition (halb / dreiviertel) mit frei wählbaren input_number‑Verzögerungen.
+  name: Rolladen Fensterposition Script
+  description: Erzeugt ein Script für einen Rolladen mit wählbarer Position (hoch, runter, halb, dreiviertel) und konfigurierbaren Zeit-Helfern.
   domain: script
-  source_url: https://example.com/rolladen-fensterposition-blueprint
+  source_url: ""
   input:
-    rolladen_hoch_button:
-      name: Button Rolladen hoch
-      description: Entity-ID des Hoch-Buttons (z.B. s7_plc_rolladen_wohnzimmer_strasse_hoch)
+    target_button_hoch:
+      name: Button Hoch
+      description: Button-Entität zum Hochfahren des Rolladens
       selector:
         entity:
           domain: button
-    rolladen_runter_button:
-      name: Button Rolladen runter
-      description: Entity-ID des Runter-Buttons
+    target_button_runter:
+      name: Button Runter
+      description: Button-Entität zum Runterfahren des Rolladens
       selector:
         entity:
           domain: button
-    rolladen_stop_button:
-      name: Button Rolladen stop
-      description: Entity-ID des Stop-Buttons
+    target_button_stop:
+      name: Button Stop
+      description: Button-Entität zum Stoppen des Rolladens
       selector:
         entity:
           domain: button
 
-    ziel_position:
-      name: Zielposition
-      description: Welche Stellung soll angefahren werden?
-      default: halb
-      selector:
-        select:
-          mode: dropdown
-          options:
-            - label: Hoch / komplett auf
-              value: hoch
-            - label: Halb zu
-              value: halb
-            - label: Dreiviertel zu
-              value: dreiviertel
-
-    delay_komplett_zu:
-      name: Zeit für komplett zu
+    helper_komplett_zu:
+      name: Helfer komplett zu
       description: input_number für „Fenster komplett zu“
       selector:
         entity:
           domain: input_number
 
-    delay_halb_zu:
-      name: Zeit für halb zu
+    helper_halb_zu:
+      name: Helfer halb zu
       description: input_number für „Fenster halb zu“
       selector:
         entity:
           domain: input_number
 
-    delay_dreiviertel_zu:
-      name: Zeit für dreiviertel zu
+    helper_drei_viertel_zu:
+      name: Helfer drei-viertel zu
       description: input_number für „Fenster drei-viertel zu“
       selector:
         entity:
           domain: input_number
 
+    helper_gross_drei_viertel_zu:
+      name: Helfer groß drei-viertel zu
+      description: input_number für „Fenster groß drei-viertel zu“ (falls benötigt)
+      selector:
+        entity:
+          domain: input_number
+
+    ziel_position:
+      name: Ziel-Position
+      description: Endposition des Rolladens
+      default: hoch
+      selector:
+        select:
+          options:
+            - label: Hoch
+              value: hoch
+            - label: Runter
+              value: runter
+            - label: Halb
+              value: halb
+            - label: Dreiviertel
+              value: dreiviertel
+
 mode: restart
-alias: Rolladen Fensterposition per Blueprint
-
+alias: Rolladen Fensterposition ausgeführt
 sequence:
-  # Zuerst komplett schließen (hoch oder runter, je nach deiner Logik – hier Beispiel: runter)
+  # Erst komplett hoch
   - action: button.press
     target:
-      entity_id: !input rolladen_runter_button
+      entity_id: !input target_button_hoch
+    data: {}
 
+  # Warten, bis komplett oben (nutzt Helfer "komplett_zu")
   - delay:
-      seconds: "{{ states(!input delay_komplett_zu) | int }}"
+      seconds: "{{ states( (blueprint.inputs.helper_komplett_zu) ) | int }}"
 
+  # Stop
   - action: button.press
     target:
-      entity_id: !input rolladen_stop_button
+      entity_id: !input target_button_stop
+    data: {}
 
-  # Jetzt je nach Zielposition wieder ein Stück öffnen
+  # Je nach Ziel-Position weiterfahren nach unten
   - choose:
-      # Ziel: halb
-      - conditions: "{{ !input ziel_position == 'halb' }}"
-        sequence:
-          - action: button.press
-            target:
-              entity_id: !input rolladen_hoch_button
-          - delay:
-              seconds: "{{ states(!input delay_halb_zu) | int }}"
-          - action: button.press
-            target:
-              entity_id: !input rolladen_stop_button
+      # Nur "hoch": nichts weiter tun
+      - conditions:
+          - condition: template
+            value_template: "{{ blueprint.inputs.ziel_position == 'hoch' }}"
+        sequence: []
 
-      # Ziel: dreiviertel
-      - conditions: "{{ !input ziel_position == 'dreiviertel' }}"
+      # Nur komplett runter
+      - conditions:
+          - condition: template
+            value_template: "{{ blueprint.inputs.ziel_position == 'runter' }}"
         sequence:
           - action: button.press
             target:
-              entity_id: !input rolladen_hoch_button
+              entity_id: !input target_button_runter
+            data: {}
           - delay:
-              seconds: "{{ states(!input delay_dreiviertel_zu) | int }}"
+              seconds: "{{ states( (blueprint.inputs.helper_komplett_zu) ) | int }}"
           - action: button.press
             target:
-              entity_id: !input rolladen_stop_button
+              entity_id: !input target_button_stop
+            data: {}
 
-      # Ziel: hoch (komplett auf) – optional: erst komplett zu, dann komplett hoch
-      - conditions: "{{ !input ziel_position == 'hoch' }}"
+      # Halb
+      - conditions:
+          - condition: template
+            value_template: "{{ blueprint.inputs.ziel_position == 'halb' }}"
         sequence:
           - action: button.press
             target:
-              entity_id: !input rolladen_hoch_button
-          # falls du dafür auch einen eigenen input_number hast, kannst du hier delay ergänzen
-          # - delay:
-          #     seconds: "{{ states('input_number.fenster_gross_komplett_auf') | int }}"
+              entity_id: !input target_button_runter
+            data: {}
+          - delay:
+              seconds: "{{ states( (blueprint.inputs.helper_halb_zu) ) | int }}"
           - action: button.press
             target:
-              entity_id: !input rolladen_stop_button
+              entity_id: !input target_button_stop
+            data: {}
+
+      # Dreiviertel (hier Beispiel mit helper_drei_viertel_zu)
+      - conditions:
+          - condition: template
+            value_template: "{{ blueprint.inputs.ziel_position == 'dreiviertel' }}"
+        sequence:
+          - action: button.press
+            target:
+              entity_id: !input target_button_runter
+            data: {}
+          - delay:
+              seconds: "{{ states( (blueprint.inputs.helper_drei_viertel_zu) ) | int }}"
+          - action: button.press
+            target:
+              entity_id: !input target_button_stop
+            data: {}
+    default: []
